@@ -1,11 +1,11 @@
-# Create a virtual environment:
+### Create a virtual environment:
 python -m venv venv
 
-# Activate the virtual environment:
+### Activate the virtual environment:
 source venv/bin/activate
 
-# Installing Dependencies
+### Installing Dependencies
 pip install -r requirements.txt
 
-# execute program
+### execute program
 streamlit run main.py
