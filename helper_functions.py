@@ -1,11 +1,16 @@
-# helper_functions.py
+#helper_functions.py
 
-from typing import List, Any
+from typing import List
+import re
+import os
 from inception_prompts import assistant_inception_prompt, user_inception_prompt
 from langchain.prompts.chat import SystemMessagePromptTemplate
 from langchain.schema import BaseMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
-from tools import CreateFolderTool, CreateFileTool
+from langchain.tools import Tool
+from tools import create_folder_tool, create_file_tool
+
+DEFAULT_BASE_PATH = "/Users/isaiahlove/Desktop/"
 
 # Create System Messages
 def get_sys_msgs(assistant_role_name: str, user_role_name: str, task: str):
@@ -35,7 +40,7 @@ class CAMELAgent:
         self,
         system_message: SystemMessage,
         model: ChatOpenAI,
-        tools: List[Any] = None  # Accept custom tools
+        tools: List[Tool] = None
     ) -> None:
         self.system_message = system_message
         self.model = model
@@ -55,32 +60,55 @@ class CAMELAgent:
 
     def step(self, input_message: HumanMessage) -> BaseMessage:
         messages = self.update_messages(input_message)
-
-        # Process custom tools before model call
-        tool_result = None
-        for tool in self.tools:
-            if isinstance(tool, CreateFolderTool) and "Use CreateFolderTool" in input_message.content:
-                folder_path = input_message.content.split("Use CreateFolderTool to create a folder at ")[1].strip()
-                if folder_path:
-                    tool_result = tool.run(folder_path)
-                else:
-                    tool_result = "No folder path specified."
-            elif isinstance(tool, CreateFileTool) and "Use CreateFileTool" in input_message.content:
-                parts = input_message.content.split("Use CreateFileTool to create a file at ")[1].split(" with content ")
-                if len(parts) == 2:
-                    file_path = parts[0].strip()
-                    content = parts[1].strip()
-                    if file_path:
-                        tool_result = tool.run(file_path, content)
-                    else:
-                        tool_result = "No file path specified."
-                else:
-                    tool_result = "No file path or content specified."
-
-            if tool_result:
-                print(tool_result)
-
         output_message = self.model.invoke(messages)
         self.update_messages(output_message)
-
+        self.invoke_tools(output_message.content)
         return output_message
+
+    def invoke_tools(self, message_content: str):
+        # Determine if the message is a command to create a folder or file
+        if "create a folder at" in message_content:
+            folder_path = self.extract_path(message_content)
+            # Join the folder path with the default base path
+            folder_path = os.path.join(DEFAULT_BASE_PATH, folder_path)
+            print(f"create a folder at: {folder_path}")
+            create_folder_tool.func(folder_path)
+        print(f"message_content before create file if block: {message_content}")
+        if "create a file at" in message_content:
+            file_path, content = self.extract_file_details(message_content)
+             # Join the folder path with the default base path
+            filePath = os.path.join(DEFAULT_BASE_PATH, file_path)
+            print(f"create a file at: {filePath}, content: {content}")
+            create_file_tool.func(filePath, content)
+
+    def extract_path(self, message_content: str) -> str:
+        """
+        Extract folder path from message content.
+        Assumes message format: 'create folder at /path/to/folder'
+        """
+        match = re.search(r'create a folder at ([\S]+)', message_content)
+        if match:
+            return match.group(1)
+        else:
+            raise ValueError("Folder path not found in message content")
+
+    def extract_file_details(self, message_content: str) -> tuple:
+        """
+        Extract file path and content from message content.
+        Assumes message format: 'create file at /path/to/file with content: <content>'
+        """
+        print(f"extract_file_details | message_content: {message_content}")
+        path_match = re.search(r'create a file at ([\S]+)', message_content)
+        # content_match = re.search(r'with content: (.+)', message_content)
+        content_match = re.search(r'```[\s\S]*?\n([\s\S]*?)```', message_content)
+        if not content_match:
+            content_match = re.search(r'with content\n([\s\S]*?)$', message_content.strip())
+        print(f"path_match: {path_match}, content_match: {content_match}")
+        if path_match and content_match:
+            return path_match.group(1), content_match.group(1)
+        else:
+            if not path_match:
+                raise ValueError(f"File path not found in message content")
+            if not content_match:
+                raise ValueError(f"File content not found in message content")
+

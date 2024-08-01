@@ -1,15 +1,16 @@
 # main.py
-
 import os
 import openai
 import streamlit as st
 from dotenv import load_dotenv
 from langchain_openai import ChatOpenAI
 from prompts import task_specifier_prompt
+from langchain.agents import initialize_agent, AgentType
 from langchain.prompts.chat import HumanMessagePromptTemplate
 from langchain.schema import (AIMessage, HumanMessage, SystemMessage)
 from helper_functions import get_sys_msgs, CAMELAgent
-from tools import CreateFolderTool, CreateFileTool
+from tools import create_folder_tool, create_file_tool
+
 
 # Load OpenAI API key
 load_dotenv()
@@ -17,7 +18,7 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai.api_key = OPENAI_API_KEY
 
 # Create models
-task_specify_model = ChatOpenAI(temperature=0.2)
+task_specify_model = ChatOpenAI(temperature=0)
 assistant_model = ChatOpenAI(temperature=0)
 user_model = ChatOpenAI(temperature=0)
 
@@ -29,7 +30,7 @@ st.header("LangChain: Self-Reflecting Agents 🤖🔗")
 base_path = "/Users/isaiahlove/Desktop/"
 default_assistant_role_name = "Full Stack Javascript Developer"
 default_user_role_name = "Project manager"
-default_task = "Create a crm using react and typescript. You should create the necessary Project folder, file structure, components and code. You should provide the code for each file."
+default_task = "Create a CRM using React and TypeScript. First, list the Folder and file structure of the project. You should always begin with Project Folder as the parent Folder of the project. Secondly, Create the Project Folder, Child Folders and files. Thirdly, make sure to write the code in each file."
 default_word_limit = 100
 
 # Get user input
@@ -42,13 +43,12 @@ word_limit = st.sidebar.number_input("Word Limit for Task Brainstorming", value=
 assistant_sys_msg, user_sys_msg = get_sys_msgs(assistant_role_name, user_role_name, specified_task)
 
 # Create custom tools
-create_folder_tool = CreateFolderTool()
-create_file_tool = CreateFileTool()
 tools = [create_folder_tool, create_file_tool]
 
 # Create CAMEL agents with tools
 assistant_agent = CAMELAgent(assistant_sys_msg, assistant_model, tools)
 user_agent = CAMELAgent(user_sys_msg, user_model, tools)
+coder_agent = initialize_agent(tools, assistant_model, agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
 # Task specific Agent
 task_specifier_sys_msg = SystemMessage(content="You can make a task more specific.")
@@ -70,17 +70,13 @@ st.success(specified_task_msg.content)
 specified_task = specified_task_msg.content
 
 st.subheader("Conversation")
-chat_turn_limit, n = 5, 0
+chat_turn_limit, n = 25, 0
 prev_instructions = set()
 
 while n < chat_turn_limit:
     n += 1
     user_ai_msg = user_agent.step(HumanMessage(content=f"Instruction {n}: {specified_task}"))
     user_msg = HumanMessage(content=user_ai_msg.content)
-
-    # if user_msg.content in prev_instructions:
-    #     user_msg.content += f" (variation {n})"
-    # prev_instructions.add(user_msg.content)
 
     assistant_ai_msg = assistant_agent.step(user_msg)
     assistant_msg = HumanMessage(content=assistant_ai_msg.content)
