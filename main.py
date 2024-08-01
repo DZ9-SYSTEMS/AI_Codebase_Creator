@@ -1,4 +1,3 @@
-# main.py
 import os
 import openai
 import streamlit as st
@@ -48,7 +47,6 @@ tools = [create_folder_tool, create_file_tool]
 # Create CAMEL agents with tools
 assistant_agent = CAMELAgent(assistant_sys_msg, assistant_model, tools)
 user_agent = CAMELAgent(user_sys_msg, user_model, tools)
-coder_agent = initialize_agent(tools, assistant_model, agent_type=AgentType.ZERO_SHOT_REACT_DESCRIPTION, verbose=True)
 
 # Task specific Agent
 task_specifier_sys_msg = SystemMessage(content="You can make a task more specific.")
@@ -61,31 +59,33 @@ task_specifier_msg = task_specifier_template.format_messages(
 )[0]
 
 stored_messages = [task_specifier_sys_msg]
-specified_task_msg = task_specify_model.invoke([task_specifier_sys_msg, task_specifier_msg])
-stored_messages.append(specified_task_msg)
 
-# Streamlit text output
-st.subheader(f"Specified task:")
-st.success(specified_task_msg.content)
-specified_task = specified_task_msg.content
+if st.sidebar.button("Submit Task"):
+    specified_task_msg = task_specify_model.invoke([task_specifier_sys_msg, task_specifier_msg])
+    stored_messages.append(specified_task_msg)
 
-st.subheader("Conversation")
-chat_turn_limit, n = 25, 0
-prev_instructions = set()
+    # Streamlit text output
+    st.subheader(f"Specified task:")
+    st.success(specified_task_msg.content)
+    specified_task = specified_task_msg.content
 
-while n < chat_turn_limit:
-    n += 1
-    user_ai_msg = user_agent.step(HumanMessage(content=f"Instruction {n}: {specified_task}"))
-    user_msg = HumanMessage(content=user_ai_msg.content)
+    st.subheader("Conversation")
+    chat_turn_limit, n = 25, 0
+    prev_instructions = set()
 
-    assistant_ai_msg = assistant_agent.step(user_msg)
-    assistant_msg = HumanMessage(content=assistant_ai_msg.content)
+    while n < chat_turn_limit:
+        n += 1
+        user_ai_msg = user_agent.step(HumanMessage(content=f"Instruction {n}: {specified_task}"))
+        user_msg = HumanMessage(content=user_ai_msg.content)
 
-    # Display the conversation in chat format
-    st.text(f"AI User ({user_role_name}):")
-    st.info(user_msg.content)
-    st.text(f"AI Assistant ({assistant_role_name}):")
-    st.success(assistant_msg.content)
+        assistant_ai_msg = assistant_agent.step(user_msg)
+        assistant_msg = HumanMessage(content=assistant_ai_msg.content)
 
-    if "<CAMEL_TASK_DONE>" in user_msg.content:
-        break
+        # Display the conversation in chat format
+        st.text(f"AI User ({user_role_name}):")
+        st.info(user_msg.content)
+        st.text(f"AI Assistant ({assistant_role_name}):")
+        st.success(assistant_msg.content)
+
+        if "<CAMEL_TASK_DONE>" in user_msg.content:
+            break
