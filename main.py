@@ -71,7 +71,6 @@ if st.sidebar.button("Submit Task"):
 
     st.subheader("Conversation")
     chat_turn_limit, n = 25, 0
-    prev_instructions = set()
 
     while n < chat_turn_limit:
         n += 1
