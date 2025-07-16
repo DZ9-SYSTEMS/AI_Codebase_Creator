@@ -1,4 +1,4 @@
-![Purple App Phone Mockup Sales Marketing Presentation](https://github.com/user-attachments/assets/2956de63-dc1b-4eea-a196-258b45c18989)
+ https://github.com/user-attachments/assets/3b3a987f-72e4-40a8-8815-9d09143291b7
 
 # AI Codebase Creator
 
